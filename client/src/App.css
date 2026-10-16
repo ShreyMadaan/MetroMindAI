@@ -2233,3 +2233,35 @@
     font-size: 11px;
   }
 }
+
+/* Google Sign-In */
+
+.auth-google-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 45px;
+  margin: 4px 0 18px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.auth-divider span {
+  white-space: nowrap;
+}

@@ -1,13 +1,20 @@
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
-import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeftRight,
   ArrowRight,
   BrainCircuit,
   Clock3,
   GitBranch,
+  LogIn,
+  LogOut,
   RefreshCw,
   TrainFront,
+  UserRound,
 } from "lucide-react";
 
 import StationSelect from "./components/StationSelect";
@@ -15,13 +22,18 @@ import RouteResults from "./components/RouteResults";
 import RouteComparison from "./components/RouteComparison";
 import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import NetworkMap from "./components/NetworkMap";
+import AuthModal from "./components/AuthModal";
 
 import {
   getStations,
   getRouteComparisons,
+  getCurrentUser,
 } from "./services/api";
 
 import "./App.css";
+import "./Auth.css";
+
+const TOKEN_KEY = "metromind_auth_token";
 
 const optimizationModes = [
   {
@@ -50,17 +62,128 @@ function App() {
   const [destination, setDestination] = useState("");
   const [optimize, setOptimize] = useState("time");
 
-  const [comparisons, setComparisons] = useState(null);
-  const [activeMode, setActiveMode] = useState("time");
+  const [comparisons, setComparisons] =
+    useState(null);
+
+  const [activeMode, setActiveMode] =
+    useState("time");
 
   const [loading, setLoading] = useState(false);
+
   const [stationsLoading, setStationsLoading] =
     useState(true);
 
-  const [stationsError, setStationsError] = useState("");
-  const [routeError, setRouteError] = useState("");
-  const [comparisonWarnings, setComparisonWarnings] =
-    useState([]);
+  const [stationsError, setStationsError] =
+    useState("");
+
+  const [routeError, setRouteError] =
+    useState("");
+
+  const [
+    comparisonWarnings,
+    setComparisonWarnings,
+  ] = useState([]);
+
+  // ==============================
+  // Authentication
+  // ==============================
+
+  const [token, setToken] = useState(() =>
+    sessionStorage.getItem(TOKEN_KEY)
+  );
+
+  const [user, setUser] = useState(null);
+
+  const [authLoading, setAuthLoading] =
+    useState(Boolean(token));
+
+  const [authModal, setAuthModal] =
+    useState(null);
+
+  const [authError, setAuthError] =
+    useState("");
+
+  const handleLogout = useCallback(() => {
+    sessionStorage.removeItem(TOKEN_KEY);
+    setToken(null);
+    setUser(null);
+    setAuthLoading(false);
+    setAuthError("");
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setUser(null);
+      setAuthLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      setAuthLoading(true);
+
+      try {
+        const result = await getCurrentUser(token);
+
+        if (cancelled) return;
+
+        const account =
+          result.data?.user ||
+          result.data ||
+          result.user;
+
+        if (
+          !account ||
+          typeof account !== "object" ||
+          !account.email
+        ) {
+          throw new Error(
+            "Unable to verify your account."
+          );
+        }
+
+        setUser(account);
+        setAuthError("");
+      } catch (error) {
+        if (cancelled) return;
+
+        sessionStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+
+        setAuthError(
+          error.message ||
+          "Your session could not be verified."
+        );
+      } finally {
+        if (!cancelled) {
+          setAuthLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const handleAuthenticated = (newToken) => {
+    sessionStorage.setItem(
+      TOKEN_KEY,
+      newToken
+    );
+
+    setAuthError("");
+    setToken(newToken);
+    setAuthModal(null);
+  };
+
+  // ==============================
+  // Stations
+  // ==============================
 
   const loadStations = useCallback(async () => {
     try {
@@ -88,6 +211,10 @@ function App() {
     loadStations();
   }, [loadStations]);
 
+  // ==============================
+  // Route planner
+  // ==============================
+
   const resetResults = () => {
     setComparisons(null);
     setComparisonWarnings([]);
@@ -100,7 +227,10 @@ function App() {
     resetResults();
   };
 
-  const handleStationChange = (field, value) => {
+  const handleStationChange = (
+    field,
+    value
+  ) => {
     if (field === "source") {
       setSource(value);
     } else {
@@ -131,18 +261,24 @@ function App() {
     resetResults();
 
     try {
-      const result = await getRouteComparisons({
-        source,
-        destination,
-      });
+      const result =
+        await getRouteComparisons({
+          source,
+          destination,
+        });
 
       setComparisons(result.comparisons);
-      setComparisonWarnings(result.errors || []);
+
+      setComparisonWarnings(
+        result.errors || []
+      );
 
       const preferredMode =
         result.comparisons[optimize]
           ? optimize
-          : Object.keys(result.comparisons)[0];
+          : Object.keys(
+              result.comparisons
+            )[0];
 
       setActiveMode(preferredMode);
     } catch (error) {
@@ -154,6 +290,12 @@ function App() {
 
   const activeRoute =
     comparisons?.[activeMode] || null;
+
+  const displayName =
+    user?.name ||
+    user?.fullName ||
+    user?.email?.split("@")[0] ||
+    "Account";
 
   return (
     <div className="app-shell">
@@ -175,7 +317,9 @@ function App() {
               </span>
 
               <span className="brand-credit">
-                <span className="brand-by">by</span>{" "}
+                <span className="brand-by">
+                  by
+                </span>{" "}
                 <span className="brand-primary">
                   Shrey
                 </span>{" "}
@@ -194,6 +338,53 @@ function App() {
             <span className="version-badge">
               BETA
             </span>
+
+            {authLoading ? (
+              <span className="nav-auth-status">
+                Checking session...
+              </span>
+            ) : user ? (
+              <div className="nav-user">
+                <span className="nav-user-name">
+                  <UserRound size={17} />
+                  {displayName}
+                </span>
+
+                <button
+                  type="button"
+                  className="nav-logout-button"
+                  onClick={handleLogout}
+                  title="Logout"
+                >
+                  <LogOut size={17} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
+              <div className="nav-auth-actions">
+                <button
+                  type="button"
+                  className="nav-login-button"
+                  onClick={() =>
+                    setAuthModal("login")
+                  }
+                >
+                  <LogIn size={17} />
+                  Login
+                </button>
+
+                <button
+                  type="button"
+                  className="nav-signup-button"
+                  onClick={() =>
+                    setAuthModal("signup")
+                  }
+                >
+                  Sign Up
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -218,6 +409,21 @@ function App() {
               stops, and line interchanges.
             </p>
 
+            {user && (
+              <p className="auth-welcome">
+                Welcome back, {displayName}!
+              </p>
+            )}
+
+            {authError && !user && (
+              <p
+                className="auth-session-error"
+                role="alert"
+              >
+                {authError}
+              </p>
+            )}
+
             <div className="hero-stats">
               <div>
                 <strong>3</strong>
@@ -227,7 +433,9 @@ function App() {
               <div className="stat-divider" />
 
               <div>
-                <strong>{stations.length}</strong>
+                <strong>
+                  {stations.length}
+                </strong>
                 <span>Demo stations</span>
               </div>
 
@@ -235,7 +443,9 @@ function App() {
 
               <div>
                 <strong>10</strong>
-                <span>Algorithm tests passed</span>
+                <span>
+                  Algorithm tests passed
+                </span>
               </div>
             </div>
           </div>
@@ -250,7 +460,9 @@ function App() {
                     METROMIND ROUTE PLANNER
                   </p>
 
-                  <h2>Where are we heading?</h2>
+                  <h2>
+                    Where are we heading?
+                  </h2>
                 </div>
 
                 <div className="planner-header-icon">
@@ -275,7 +487,8 @@ function App() {
                       gap: "8px",
                       marginTop: "10px",
                       padding: "9px 12px",
-                      border: "1px solid #fecaca",
+                      border:
+                        "1px solid #fecaca",
                       borderRadius: "8px",
                       background: "#ffffff",
                       color: "#b91c1c",
@@ -315,7 +528,9 @@ function App() {
                     title="Swap stations"
                     disabled={stationsLoading}
                   >
-                    <ArrowLeftRight size={19} />
+                    <ArrowLeftRight
+                      size={19}
+                    />
                   </button>
 
                   <StationSelect
@@ -337,43 +552,57 @@ function App() {
                 </div>
 
                 <div className="preferences">
-                  <h3>Optimize your journey</h3>
+                  <h3>
+                    Optimize your journey
+                  </h3>
 
                   <div className="optimization-grid">
-                    {optimizationModes.map((mode) => {
-                      const Icon = mode.icon;
+                    {optimizationModes.map(
+                      (mode) => {
+                        const Icon =
+                          mode.icon;
 
-                      return (
-                        <button
-                          type="button"
-                          key={mode.value}
-                          className={`optimization-option ${
-                            optimize === mode.value
-                              ? "selected"
-                              : ""
-                          }`}
-                          onClick={() => {
-                            setOptimize(mode.value);
+                        return (
+                          <button
+                            type="button"
+                            key={mode.value}
+                            className={`optimization-option ${
+                              optimize ===
+                              mode.value
+                                ? "selected"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              setOptimize(
+                                mode.value
+                              );
 
-                            if (
-                              comparisons?.[mode.value]
-                            ) {
-                              setActiveMode(mode.value);
-                            }
-                          }}
-                        >
-                          <Icon size={20} />
+                              if (
+                                comparisons?.[
+                                  mode.value
+                                ]
+                              ) {
+                                setActiveMode(
+                                  mode.value
+                                );
+                              }
+                            }}
+                          >
+                            <Icon size={20} />
 
-                          <strong>
-                            {mode.title}
-                          </strong>
+                            <strong>
+                              {mode.title}
+                            </strong>
 
-                          <span>
-                            {mode.description}
-                          </span>
-                        </button>
-                      );
-                    })}
+                            <span>
+                              {
+                                mode.description
+                              }
+                            </span>
+                          </button>
+                        );
+                      }
+                    )}
                   </div>
                 </div>
 
@@ -402,7 +631,9 @@ function App() {
                     : "Compare Best Routes"}
 
                   {!loading && (
-                    <ArrowRight size={20} />
+                    <ArrowRight
+                      size={20}
+                    />
                   )}
                 </button>
               </form>
@@ -419,13 +650,14 @@ function App() {
                   }}
                 />
 
-                {comparisonWarnings.length > 0 && (
+                {comparisonWarnings.length >
+                  0 && (
                   <p
                     className="error-message"
                     role="status"
                   >
-                    Some route calculations were
-                    unavailable:{" "}
+                    Some route calculations
+                    were unavailable:{" "}
                     {comparisonWarnings
                       .map(
                         (warning) =>
@@ -435,14 +667,16 @@ function App() {
                   </p>
                 )}
 
-                <RouteResults route={activeRoute} />
+                <RouteResults
+                  route={activeRoute}
+                />
               </>
             )}
 
-            {/* Interactive Metro Network Map */}
-            <NetworkMap route={activeRoute} />
+            <NetworkMap
+              route={activeRoute}
+            />
 
-            {/* Network Analytics Dashboard */}
             <AnalyticsDashboard />
           </div>
         </section>
@@ -451,15 +685,31 @@ function App() {
       <footer className="site-footer">
         <div className="container footer-content">
           <span>
-            MetroMind AI · Designed & Developed by{" "}
-            <strong>Shrey Madaan</strong>
+            MetroMind AI · Designed &
+            Developed by{" "}
+            <strong>
+              Shrey Madaan
+            </strong>
           </span>
 
           <span>
-            Intelligent Metro Navigation & Analytics
+            Intelligent Metro Navigation
+            & Analytics
           </span>
         </div>
       </footer>
+
+      {authModal && (
+        <AuthModal
+          initialMode={authModal}
+          onClose={() =>
+            setAuthModal(null)
+          }
+          onAuthenticated={
+            handleAuthenticated
+          }
+        />
+      )}
     </div>
   );
 }

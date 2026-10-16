@@ -1,17 +1,37 @@
-
 const API_URL = (
   import.meta.env.VITE_API_URL ||
   "http://localhost:5000/api"
 ).replace(/\/$/, "");
 
-const request = async (endpoint) => {
+const request = async (
+  endpoint,
+  { method = "GET", body, token, signal } = {}
+) => {
   let response;
 
   try {
-    response = await fetch(`${API_URL}${endpoint}`);
-  } catch {
+    response = await fetch(`${API_URL}${endpoint}`, {
+      method,
+      headers: {
+        ...(body !== undefined
+          ? { "Content-Type": "application/json" }
+          : {}),
+        ...(token
+          ? { Authorization: `Bearer ${token}` }
+          : {}),
+      },
+      ...(body !== undefined
+        ? { body: JSON.stringify(body) }
+        : {}),
+      ...(signal ? { signal } : {}),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw error;
+    }
+
     throw new Error(
-      `Cannot connect to MetroMind API at ${API_URL}. Check that the backend is running.`
+      `Cannot connect to MetroMind API at ${API_URL}.`
     );
   }
 
@@ -35,15 +55,25 @@ const request = async (endpoint) => {
   return result;
 };
 
+// ==============================
+// Stations
+// ==============================
+
 export const getStations = async () => {
   const result = await request("/stations");
 
   if (!Array.isArray(result.data)) {
-    throw new Error("Station API returned an invalid data format.");
+    throw new Error(
+      "Station API returned an invalid data format."
+    );
   }
 
   return result.data;
 };
+
+// ==============================
+// Routes
+// ==============================
 
 export const getRoute = async ({
   source,
@@ -103,6 +133,9 @@ export const getRouteComparisons = async ({
   return { comparisons, errors };
 };
 
+// ==============================
+// Analytics
+// ==============================
 
 export const getNetworkAnalytics = async () => {
   const result = await request("/analytics/network");
@@ -114,4 +147,40 @@ export const getNetworkAnalytics = async () => {
   }
 
   return result.data;
+};
+
+// ==============================
+// Authentication
+// ==============================
+
+export const registerUser = async ({
+  name,
+  email,
+  password,
+}) => {
+  return request("/auth/register", {
+    method: "POST",
+    body: { name, email, password },
+  });
+};
+
+export const loginUser = async ({
+  email,
+  password,
+}) => {
+  return request("/auth/login", {
+    method: "POST",
+    body: { email, password },
+  });
+};
+
+export const getCurrentUser = async (token) => {
+  return request("/auth/me", { token });
+};
+
+export const loginWithGoogle = async (credential) => {
+  return request("/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
 };
