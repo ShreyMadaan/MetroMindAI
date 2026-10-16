@@ -41,13 +41,24 @@ app.use(
       }
 
       return callback(
-        Object.assign(new Error("CORS origin not allowed"), {
-          status: 403,
-        })
+        Object.assign(
+          new Error("CORS origin not allowed"),
+          { status: 403 }
+        )
       );
     },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   })
 );
 
@@ -61,7 +72,8 @@ app.get("/api/health", (req, res) => {
   return res.status(200).json({
     success: true,
     message: "MetroMind AI API is running",
-    environment: process.env.NODE_ENV || "development",
+    environment:
+      process.env.NODE_ENV || "development",
   });
 });
 
@@ -94,20 +106,29 @@ let shuttingDown = false;
 const startServer = async () => {
   try {
     if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not configured");
+      throw new Error(
+        "JWT_SECRET is not configured"
+      );
     }
 
-    if (!process.env.MONGO_URI) {
-      throw new Error("MONGO_URI is not configured");
+    // Corrected to match the existing .env and db.js
+    if (!process.env.MONGODB_URI) {
+      throw new Error(
+        "MONGODB_URI is not configured"
+      );
     }
 
     await connectDB();
 
-    server = app.listen(PORT, "0.0.0.0", () => {
-      console.log(
-        `MetroMind AI API running on port ${PORT}`
-      );
-    });
+    server = app.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log(
+          `MetroMind AI API running on port ${PORT}`
+        );
+      }
+    );
   } catch (error) {
     console.error(
       "Server startup failed:",
@@ -118,11 +139,17 @@ const startServer = async () => {
   }
 };
 
+// ============================================
+// Graceful Shutdown
+// ============================================
+
 const shutdown = async (signal) => {
   if (shuttingDown) return;
   shuttingDown = true;
 
-  console.log(`${signal} received. Shutting down...`);
+  console.log(
+    `${signal} received. Shutting down...`
+  );
 
   try {
     if (server) {
@@ -139,12 +166,20 @@ const shutdown = async (signal) => {
     console.log("Shutdown completed.");
     process.exit(0);
   } catch (error) {
-    console.error("Shutdown failed:", error.message);
+    console.error(
+      "Shutdown failed:",
+      error.message
+    );
     process.exit(1);
   }
 };
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () =>
+  shutdown("SIGINT")
+);
+
+process.on("SIGTERM", () =>
+  shutdown("SIGTERM")
+);
 
 startServer();
