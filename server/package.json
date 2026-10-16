@@ -1,0 +1,37 @@
+
+{
+  "name": "metromind-ai-server",
+  "version": "1.0.0",
+  "description": "MetroMind AI REST API - Intelligent Metro Route Optimization and Network Analytics",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "test": "node --test src/tests/*.test.js",
+    "test:routes": "node --test src/tests/graphService.test.js",
+    "validate:network": "node src/scripts/validateMetroNetwork.js",
+    "test:network": "node src/scripts/testNetworkRoutes.js"
+  },
+  "keywords": [
+    "metro",
+    "route-optimization",
+    "graph-algorithms",
+    "express",
+    "mongodb",
+    "mern"
+  ],
+  "author": "Shrey Madaan",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.2"
+  }
+}
