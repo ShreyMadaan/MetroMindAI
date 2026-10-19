@@ -1,0 +1,6 @@
+.mm-shimmer{display:block;background:linear-gradient(100deg,#e6edf4 25%,#f7fbff 42%,#e6edf4 60%);background-size:220% 100%;animation:mm-shimmer 1.4s ease-in-out infinite;border-radius:8px}
+.mm-skeleton-stations{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);align-items:end;gap:16px;margin:18px 0}
+.mm-skeleton-field{display:grid;gap:12px}.mm-skeleton-label{width:42%;height:13px}.mm-skeleton-input{width:100%;height:52px}.mm-skeleton-swap{width:40px;height:40px;border-radius:50%}.mm-skeleton-results{margin:24px 0;display:grid;gap:18px}.mm-skeleton-title{width:40%;height:22px}.mm-skeleton-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.mm-skeleton-card{padding:18px;display:grid;gap:14px;border:1px solid #e5eaf0;border-radius:14px;background:#fff}.mm-skeleton-number{height:30px;width:60%}.mm-skeleton-line{height:12px;width:85%}
+@keyframes mm-shimmer{to{background-position-x:-220%}}
+@media(max-width:640px){.mm-skeleton-stations{grid-template-columns:1fr}.mm-skeleton-swap{justify-self:center}.mm-skeleton-cards{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.mm-shimmer{animation:none}}

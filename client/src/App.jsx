@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -23,6 +24,12 @@ import RouteComparison from "./components/RouteComparison";
 import AnalyticsDashboard from "./components/AnalyticsDashboard";
 import NetworkMap from "./components/NetworkMap";
 import AuthModal from "./components/AuthModal";
+
+import MetroLoader from "./components/MetroLoader";
+import {
+  StationSkeleton,
+  RouteSkeleton,
+} from "./components/SkeletonLoader";
 
 import {
   getStations,
@@ -57,10 +64,34 @@ const optimizationModes = [
 ];
 
 function App() {
+  // ==============================
+  // Metro stations
+  // ==============================
+
   const [stations, setStations] = useState([]);
   const [source, setSource] = useState("");
-  const [destination, setDestination] = useState("");
-  const [optimize, setOptimize] = useState("time");
+  const [destination, setDestination] =
+    useState("");
+
+  const [optimize, setOptimize] =
+    useState("time");
+
+  const [stationsLoading, setStationsLoading] =
+    useState(true);
+
+  const [stationsError, setStationsError] =
+    useState("");
+
+  // ==============================
+  // Startup loader
+  // ==============================
+
+  const [startupComplete, setStartupComplete] =
+    useState(false);
+
+  // ==============================
+  // Route comparison
+  // ==============================
 
   const [comparisons, setComparisons] =
     useState(null);
@@ -68,13 +99,8 @@ function App() {
   const [activeMode, setActiveMode] =
     useState("time");
 
-  const [loading, setLoading] = useState(false);
-
-  const [stationsLoading, setStationsLoading] =
-    useState(true);
-
-  const [stationsError, setStationsError] =
-    useState("");
+  const [loading, setLoading] =
+    useState(false);
 
   const [routeError, setRouteError] =
     useState("");
@@ -92,7 +118,8 @@ function App() {
     sessionStorage.getItem(TOKEN_KEY)
   );
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] =
+    useState(null);
 
   const [authLoading, setAuthLoading] =
     useState(Boolean(token));
@@ -105,6 +132,7 @@ function App() {
 
   const handleLogout = useCallback(() => {
     sessionStorage.removeItem(TOKEN_KEY);
+
     setToken(null);
     setUser(null);
     setAuthLoading(false);
@@ -124,7 +152,8 @@ function App() {
       setAuthLoading(true);
 
       try {
-        const result = await getCurrentUser(token);
+        const result =
+          await getCurrentUser(token);
 
         if (cancelled) return;
 
@@ -148,7 +177,10 @@ function App() {
       } catch (error) {
         if (cancelled) return;
 
-        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(
+          TOKEN_KEY
+        );
+
         setToken(null);
         setUser(null);
 
@@ -182,7 +214,7 @@ function App() {
   };
 
   // ==============================
-  // Stations
+  // Load stations
   // ==============================
 
   const loadStations = useCallback(async () => {
@@ -191,6 +223,12 @@ function App() {
       setStationsError("");
 
       const data = await getStations();
+
+      if (!Array.isArray(data)) {
+        throw new Error(
+          "Invalid station data received."
+        );
+      }
 
       setStations(data);
 
@@ -201,7 +239,11 @@ function App() {
       }
     } catch (error) {
       setStations([]);
-      setStationsError(error.message);
+
+      setStationsError(
+        error.message ||
+        "Unable to load metro stations."
+      );
     } finally {
       setStationsLoading(false);
     }
@@ -212,7 +254,33 @@ function App() {
   }, [loadStations]);
 
   // ==============================
-  // Route planner
+  // Complete startup initialization
+  // ==============================
+
+  useEffect(() => {
+    if (
+      stationsLoading ||
+      stationsError ||
+      startupComplete
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setStartupComplete(true);
+    }, 450);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    stationsLoading,
+    stationsError,
+    startupComplete,
+  ]);
+
+  // ==============================
+  // Route planner helpers
   // ==============================
 
   const resetResults = () => {
@@ -239,6 +307,10 @@ function App() {
 
     resetResults();
   };
+
+  // ==============================
+  // Find and compare routes
+  // ==============================
 
   const handleFindRoute = async (event) => {
     event.preventDefault();
@@ -267,26 +339,38 @@ function App() {
           destination,
         });
 
-      setComparisons(result.comparisons);
+      const availableComparisons =
+        result.comparisons || {};
+
+      setComparisons(
+        availableComparisons
+      );
 
       setComparisonWarnings(
         result.errors || []
       );
 
       const preferredMode =
-        result.comparisons[optimize]
+        availableComparisons[optimize]
           ? optimize
           : Object.keys(
-              result.comparisons
-            )[0];
+              availableComparisons
+            )[0] || "time";
 
       setActiveMode(preferredMode);
     } catch (error) {
-      setRouteError(error.message);
+      setRouteError(
+        error.message ||
+        "Unable to compare routes."
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  // ==============================
+  // Derived values
+  // ==============================
 
   const activeRoute =
     comparisons?.[activeMode] || null;
@@ -297,8 +381,33 @@ function App() {
     user?.email?.split("@")[0] ||
     "Account";
 
+  // ==============================
+  // Branded startup loader
+  // ==============================
+
+  if (!startupComplete) {
+    return (
+      <MetroLoader
+        ready={
+          !stationsLoading &&
+          !stationsError
+        }
+        error={stationsError}
+        onRetry={loadStations}
+      />
+    );
+  }
+
+  // ==============================
+  // Main application
+  // ==============================
+
   return (
     <div className="app-shell">
+      {/* ==========================
+          Header
+      ========================== */}
+
       <header className="site-header">
         <div className="container nav-container">
           <a href="/" className="brand">
@@ -390,6 +499,10 @@ function App() {
       </header>
 
       <main>
+        {/* ==========================
+            Hero section
+        ========================== */}
+
         <section className="hero-section">
           <div className="container hero-content">
             <div className="hero-badge">
@@ -404,9 +517,10 @@ function App() {
             </h1>
 
             <p className="hero-description">
-              Discover metro routes optimized for your
-              priorities. Compare travel time, station
-              stops, and line interchanges.
+              Discover metro routes optimized
+              for your priorities. Compare
+              travel time, station stops, and
+              line interchanges.
             </p>
 
             {user && (
@@ -427,7 +541,9 @@ function App() {
             <div className="hero-stats">
               <div>
                 <strong>3</strong>
-                <span>Optimization modes</span>
+                <span>
+                  Optimization modes
+                </span>
               </div>
 
               <div className="stat-divider" />
@@ -436,7 +552,9 @@ function App() {
                 <strong>
                   {stations.length}
                 </strong>
-                <span>Demo stations</span>
+                <span>
+                  Demo stations
+                </span>
               </div>
 
               <div className="stat-divider" />
@@ -450,6 +568,10 @@ function App() {
             </div>
           </div>
         </section>
+
+        {/* ==========================
+            Route planner
+        ========================== */}
 
         <section className="planner-section">
           <div className="container">
@@ -470,6 +592,8 @@ function App() {
                 </div>
               </div>
 
+              {/* Station loading error */}
+
               {stationsError && (
                 <div
                   className="error-message"
@@ -480,7 +604,9 @@ function App() {
                   <button
                     type="button"
                     onClick={loadStations}
-                    disabled={stationsLoading}
+                    disabled={
+                      stationsLoading
+                    }
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -501,7 +627,20 @@ function App() {
                 </div>
               )}
 
-              <form onSubmit={handleFindRoute}>
+              {/* Station shimmer */}
+
+              {stationsLoading && (
+                <StationSkeleton />
+              )}
+
+              <form
+                onSubmit={handleFindRoute}
+                style={{
+                  display: stationsLoading
+                    ? "none"
+                    : undefined,
+                }}
+              >
                 <div className="station-fields">
                   <StationSelect
                     label="Starting station"
@@ -526,7 +665,9 @@ function App() {
                     onClick={handleSwap}
                     aria-label="Swap stations"
                     title="Swap stations"
-                    disabled={stationsLoading}
+                    disabled={
+                      stationsLoading
+                    }
                   >
                     <ArrowLeftRight
                       size={19}
@@ -639,11 +780,27 @@ function App() {
               </form>
             </div>
 
-            {comparisons && (
+            {/* ======================
+                Route shimmer
+            ====================== */}
+
+            {loading && (
+              <RouteSkeleton />
+            )}
+
+            {/* ======================
+                Route comparison
+            ====================== */}
+
+            {!loading && comparisons && (
               <>
                 <RouteComparison
-                  comparisons={comparisons}
-                  activeMode={activeMode}
+                  comparisons={
+                    comparisons
+                  }
+                  activeMode={
+                    activeMode
+                  }
                   onSelect={(mode) => {
                     setActiveMode(mode);
                     setOptimize(mode);
@@ -673,14 +830,26 @@ function App() {
               </>
             )}
 
+            {/* ======================
+                Network explorer
+            ====================== */}
+
             <NetworkMap
               route={activeRoute}
             />
+
+            {/* ======================
+                Analytics
+            ====================== */}
 
             <AnalyticsDashboard />
           </div>
         </section>
       </main>
+
+      {/* ==========================
+          Footer
+      ========================== */}
 
       <footer className="site-footer">
         <div className="container footer-content">
@@ -698,6 +867,10 @@ function App() {
           </span>
         </div>
       </footer>
+
+      {/* ==========================
+          Authentication modal
+      ========================== */}
 
       {authModal && (
         <AuthModal
